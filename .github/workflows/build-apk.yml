@@ -14,9 +14,23 @@ jobs:
           channel: stable
       - run: flutter pub get
         working-directory: app
+      - name: Set up release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/android/app/pryzo-release.keystore
+          cat > app/android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=pryzo-release.keystore
+          EOF
       - run: flutter build apk --release
         working-directory: app
       - run: |
-          gh release create v1.0.7-gradle app/build/app/outputs/flutter-apk/app-release.apk --title "Pryzo v1.0.7 (Gradle build)" --notes "Built with the standard Gradle pipeline (flutter build apk --release) instead of the hand-built pipeline, to test whether the launch crash is in the manual build."
+          gh release create v1.0.8-gradle app/build/app/outputs/flutter-apk/app-release.apk --title "Pryzo v1.0.8 (Gradle build)" --notes "Built with the standard Gradle pipeline (flutter build apk --release) instead of the hand-built pipeline, to test whether the launch crash is in the manual build."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
