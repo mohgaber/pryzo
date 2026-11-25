@@ -33,6 +33,6 @@ jobs:
       - run: flutter build apk --release
         working-directory: app
       - run: |
-          gh release create v1.0.10-gradle app/build/app/outputs/flutter-apk/app-release.apk --title "Pryzo v1.0.10 (Gradle build)"
+          gh release create v1.0.10-gradle app/build/app/outputs/flutter-apk/app-release.apk --title "Pryzo v1.0.10 (Gradle build)" --notes "Built with the standard Gradle pipeline (flutter build apk --release) instead of the hand-built pipeline, to test whether the launch crash is in the manual build."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
