@@ -1,0 +1,40 @@
+name: pryzo
+description: "Pryzo — تطبيق مقارنة أسعار المتاجر الإلكترونية المصرية. يقارن أسعار المنتجات عبر أمازون وجوميا ونون ودريم 2000 ومتجر فودافون وكارفور، مع تنبيهات الأسعار وقائمة المتابعة وسجل الأسعار."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+# The following defines the version and build number for your application.
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.14.0
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  http: ^1.3.0
+  shared_preferences: ^2.5.6
+  url_launcher: ^6.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Test-only: mocking the url_launcher platform channel in widget tests.
+  url_launcher_platform_interface: ^2.3.2
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package.
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/pryzo_logo.webp

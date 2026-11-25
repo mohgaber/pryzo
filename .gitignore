@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+
+# Logs
+*.log
+
+# Pryzo local-dev database (production uses Render PostgreSQL;
+# never commit the dev DB — it holds sample + live prices)
+pryzo.db
+pryzo.db-journal
+
+# Flutter
+app/build/
+app/.dart_tool/
+app/.idea/
+app/android/.gradle/
+app/android/app/build/
+app/ios/Pods/
+*.iml
+
+# OS
+.DS_Store
