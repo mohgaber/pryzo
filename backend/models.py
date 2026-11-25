@@ -34,6 +34,12 @@ BASE_DIR = Path(__file__).resolve().parent
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", f"sqlite:///{BASE_DIR / 'pryzo.db'}"
 )
+# Render and Neon hand out Postgres URLs starting with "postgres://",
+# but SQLAlchemy 2.0 has no "postgres" dialect plugin -- create_engine
+# raises NoSuchModuleError at import time. Normalize to "postgresql://"
+# (whose driver resolves to the installed psycopg v3) before use.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
