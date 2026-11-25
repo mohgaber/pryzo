@@ -1,0 +1,20 @@
+name: Build Pryzo APK (Gradle)
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.1'
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - run: |
+          gh release create v1.0.7-gradle app/build/app/outputs/flutter-apk/app-release.apk --title "Pryzo v1.0.7 (Gradle build)" --notes "Built with the standard Gradle pipeline (flutter build apk --release) instead of the hand-built pipeline, to test whether the launch crash is in the manual build."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
