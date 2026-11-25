@@ -118,39 +118,59 @@ VARIANT_WORDS = {
 }
 
 
-def _fetch_xml(url: str) -> ET.Element | None:
-    """Fetch a sitemap XML document. Returns the root element or None."""
+def _fetch_sitemap_locs(url: str) -> tuple[bool | None, list[str]]:
+    """Fetch a sitemap and return (is_index, [loc, ...]).
+
+    For each <url>, prefer the xhtml:link alternate with hreflang="en"
+    (B.TECH lists Arabic URLs in <loc> and the English URL only in
+    the alternate link — the English page is the one whose JSON-LD
+    name matches Pryzo's English catalog); fall back to the <loc>
+    text (wazen has no alternates). Image <loc> entries are ignored.
+    Uses a 120s timeout: B.TECH's sitemap is ~45 MB and takes ~60s
+    to download, so the 20s product-page timeout would always fail.
+    Returns (None, []) when the sitemap could not be fetched/parsed.
+    """
     _polite_wait()
     try:
         resp = requests.get(
             url,
             headers={"User-Agent": USER_AGENT},
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=120,
         )
     except requests.RequestException as exc:
         log.warning("Sitemap fetch failed for %s: %s", url, exc)
-        return None
+        return None, []
     if resp.status_code != 200:
         log.warning("HTTP %s fetching sitemap %s", resp.status_code, url)
-        return None
+        return None, []
     try:
-        return ET.fromstring(resp.content)
+        root = ET.fromstring(resp.content)
     except ET.ParseError as exc:
         log.warning("Could not parse sitemap %s: %s", url, exc)
-        return None
-
-
-def _locs(root: ET.Element) -> list[str]:
-    """All <loc> texts in a sitemap document (any namespace)."""
-    out = []
-    for el in root.iter():
-        if el.tag.endswith("loc") and el.text:
-            out.append(el.text.strip())
-    return out
-
-
-def _is_sitemap_index(root: ET.Element) -> bool:
-    return root.tag.endswith("sitemapindex")
+        return None, []
+    is_index = root.tag.endswith("sitemapindex")
+    locs: list[str] = []
+    if is_index:
+        for sm in root.iter():
+            if sm.tag.endswith("sitemap"):
+                for child in sm:
+                    if child.tag.endswith("loc") and child.text:
+                        locs.append(child.text.strip())
+    else:
+        for url_el in root.iter():
+            if not url_el.tag.endswith("url"):
+                continue
+            loc = None
+            en_href = None
+            for child in url_el:
+                if child.tag.endswith("loc") and child.text:
+                    loc = child.text.strip()
+                elif child.tag.endswith("link") and child.get("hreflang") == "en":
+                    en_href = child.get("href")
+            chosen = en_href or loc
+            if chosen:
+                locs.append(chosen)
+    return is_index, locs
 
 
 def enumerate_product_urls(store_slug: str, max_urls: int = 500) -> list[str]:
@@ -164,12 +184,12 @@ def enumerate_product_urls(store_slug: str, max_urls: int = 500) -> list[str]:
     if cfg is None:
         log.error("No sitemap config for store %s", store_slug)
         return []
-    root = _fetch_xml(cfg["index"])
-    if root is None:
+    is_index, index_locs = _fetch_sitemap_locs(cfg["index"])
+    if is_index is None:
         return []
     sitemap_urls: list[str] = []
-    if _is_sitemap_index(root):
-        for loc in _locs(root):
+    if is_index:
+        for loc in index_locs:
             if cfg["sitemap_filter"] and cfg["sitemap_filter"] not in loc:
                 continue
             sitemap_urls.append(loc)
@@ -180,10 +200,10 @@ def enumerate_product_urls(store_slug: str, max_urls: int = 500) -> list[str]:
     for sm_url in sitemap_urls:
         if len(urls) >= max_urls:
             break
-        sub = _fetch_xml(sm_url)
-        if sub is None:
+        _sub_is_index, sub_locs = _fetch_sitemap_locs(sm_url)
+        if _sub_is_index is None:
             continue
-        for loc in _locs(sub):
+        for loc in sub_locs:
             if cfg["url_filter"] not in loc:
                 continue
             if loc in seen:
