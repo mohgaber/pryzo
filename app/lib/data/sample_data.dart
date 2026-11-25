@@ -30,7 +30,7 @@ const Map<String, String> sampleStoreSlugs = <String, String>{
   'كارفور': 'carrefour',
 };
 
-/// The six bundled sample products (same theme as the backend seed data).
+/// The five bundled sample products (same theme as the backend seed data).
 const List<Product> sampleProducts = <Product>[
   Product(
     id: 1,
@@ -50,14 +50,6 @@ const List<Product> sampleProducts = <Product>[
   ),
   Product(
     id: 3,
-    name: 'سامسونج جالاكسي S24 — 256 جيجا',
-    brand: 'سامسونج',
-    category: 'موبايلات',
-    lowestPrice: 34999,
-    storesCount: 5,
-  ),
-  Product(
-    id: 4,
     name: 'قلاية هوائية فيليبس 4.1 لتر',
     brand: 'فيليبس',
     category: 'أجهزة منزلية',
@@ -65,7 +57,7 @@ const List<Product> sampleProducts = <Product>[
     storesCount: 4,
   ),
   Product(
-    id: 5,
+    id: 4,
     name: 'تلفزيون سامسونج 55 بوصة 4K سمارت',
     brand: 'سامسونج',
     category: 'تلفزيونات',
@@ -73,7 +65,7 @@ const List<Product> sampleProducts = <Product>[
     storesCount: 5,
   ),
   Product(
-    id: 6,
+    id: 5,
     name: 'سماعات بلوتوث سوني WH-1000XM5',
     brand: 'سوني',
     category: 'صوتيات',
@@ -146,26 +138,19 @@ final Map<int, List<StorePrice>> samplePrices = <int, List<StorePrice>>{
     _p('كارفور', 44999, 'iPhone 15 128GB'),
   ],
   3: <StorePrice>[
-    _p('أمازون مصر', 34999, 'Samsung Galaxy S24 256GB'),
-    _p('جوميا', 35499, 'Samsung Galaxy S24 256GB'),
-    _p('نون', 35999, 'Samsung Galaxy S24 256GB'),
-    _p('متجر فودافون', 36499, 'Samsung Galaxy S24 256GB'),
-    _p('كارفور', 36999, 'Samsung Galaxy S24 256GB'),
-  ],
-  4: <StorePrice>[
     _p('نون', 5999, 'Philips Air Fryer 4.1L'),
     _p('أمازون مصر', 6299, 'Philips Air Fryer 4.1L'),
     _p('جوميا', 6499, 'Philips Air Fryer 4.1L'),
     _p('كارفور', 6799, 'Philips Air Fryer 4.1L'),
   ],
-  5: <StorePrice>[
+  4: <StorePrice>[
     _p('كارفور', 18999, 'Samsung 55 inch 4K TV'),
     _p('أمازون مصر', 19499, 'Samsung 55 inch 4K TV'),
     _p('جوميا', 19999, 'Samsung 55 inch 4K TV'),
     _p('نون', 20499, 'Samsung 55 inch 4K TV'),
     _p('دريم 2000', 21499, 'Samsung 55 inch 4K TV'),
   ],
-  6: <StorePrice>[
+  5: <StorePrice>[
     _p('أمازون مصر', 14999, 'Sony WH-1000XM5'),
     _p('جوميا', 15499, 'Sony WH-1000XM5'),
     _p('نون', 15999, 'Sony WH-1000XM5'),

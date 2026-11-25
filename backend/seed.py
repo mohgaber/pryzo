@@ -43,14 +43,16 @@ STORES = [
 #   Jumia EG: PS5 Slim Disc 50,000 / iPhone 15 128GB 50,500 /
 #     Philips HD9270/90 7,899 / Sony WH-1000XM5 (Light Blue) 17,106.
 #   Vodafone eShop: iPhone 15 128GB 54,999.
-# NOT verified (no live URL wired, sample prices only):
-#   Galaxy S24 / Galaxy A55: the 2024 models are gone from Amazon,
-#     Jumia, Dream 2000 and Vodafone -- only successors (S25 FE / S26
-#     FE, A56 / A57) are listed. LG 43UR78006: discontinued, only the
-#     newer NU85 43" 4K model is listed. Redmi Note 13: Amazon's page
-#     (B0CWRLJYGJ) is currently unavailable with no buy-box price;
-#     Jumia lists no plain Note 13. AirPods Pro 2 on Jumia: only
-#     generic knockoffs on page 1.
+# REMOVED 2026-11-26 at Mohamed's request ("drop them, keep only the
+# ones with live prices"): Galaxy S24, Galaxy A55, LG 43UR78006 and
+# Redmi Note 13 were discontinued on all 7 stores (on-site search of
+# Noon / Dream 2000 / Vodafone / Carrefour confirmed only the newer
+# generations are listed: S25/S26, A56/A57, Redmi Note 15/17, LG
+# NU85-series), so they had no live price anywhere. They were deleted
+# from the live DB by prune_products.py and removed from PRODUCTS here
+# so a re-seed never re-adds them. The 5 products left are the ones
+# with live prices: PS5, iPhone 15, Philips Air Fryer, Sony XM5,
+# AirPods Pro 2 (Vodafone 10,999 EGP, out of stock).
 #   Noon and Carrefour Egypt: unreachable from this sandbox (all
 #     requests time out, 60s+), so their pages could not be verified
 #     with the crawler -- Noon product URLs found via search
@@ -92,24 +94,6 @@ PRODUCTS = [
          "amazon-eg": _amazon_search("iPhone 15 128GB")},
     ),
     (
-        "Samsung Galaxy S24 256GB",
-        "Samsung",
-        "Smartphones",
-        None,
-        {"jumia-eg": 38999.0, "amazon-eg": 39999.0},
-        {"jumia-eg": _jumia_search("Samsung Galaxy S24"),
-         "amazon-eg": _amazon_search("Samsung Galaxy S24")},
-    ),
-    (
-        "Samsung Galaxy A55 5G 256GB",
-        "Samsung",
-        "Smartphones",
-        None,
-        {"jumia-eg": 18999.0, "amazon-eg": 19499.0, "noon": 18499.0},
-        {"jumia-eg": _jumia_search("Samsung Galaxy A55"),
-         "amazon-eg": _amazon_search("Samsung Galaxy A55")},
-    ),
-    (
         "Philips Air Fryer XL HD9270",
         "Philips",
         "Home Appliances",
@@ -117,27 +101,6 @@ PRODUCTS = [
         {"amazon-eg": 8999.0, "jumia-eg": 9499.0, "carrefour": 8799.0},
         {"jumia-eg": "https://www.jumia.com.eg/philips-essential-air-fryer-6.2l-capacity-digital-screen-black-hd927090-130811691.html",
          "amazon-eg": "https://www.amazon.eg/dp/B08WJBVM5G"},
-    ),
-    (
-        'LG 43" 4K UHD Smart TV 43UR78006',
-        "LG",
-        "TVs",
-        None,
-        {"jumia-eg": 15999.0, "amazon-eg": 16499.0},
-        {"jumia-eg": _jumia_search('LG 43 inch 4K TV'),
-         "amazon-eg": _amazon_search('LG 43 inch 4K TV')},
-    ),
-    (
-        "Xiaomi Redmi Note 13 256GB",
-        "Xiaomi",
-        "Smartphones",
-        None,
-        {"jumia-eg": 9999.0, "amazon-eg": 10499.0, "noon": 9799.0},
-        {"jumia-eg": _jumia_search("Xiaomi Redmi Note 13"),
-         # Verified 2026-11-25: exact model page (8GB/256GB, Midnight
-         # Black). Jumia Egypt only lists the 128GB variant, so there
-         # is no verified Jumia product URL for the 256GB model.
-         "amazon-eg": "https://www.amazon.eg/-/en/Xiaomi-Redmi-Note-13-Inches/dp/B0CWRLJYGJ"},
     ),
     (
         "Sony WH-1000XM5 Wireless Headphones",
