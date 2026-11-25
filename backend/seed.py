@@ -134,7 +134,10 @@ PRODUCTS = [
         None,
         {"jumia-eg": 9999.0, "amazon-eg": 10499.0, "noon": 9799.0},
         {"jumia-eg": _jumia_search("Xiaomi Redmi Note 13"),
-         "amazon-eg": _amazon_search("Xiaomi Redmi Note 13")},
+         # Verified 2026-11-25: exact model page (8GB/256GB, Midnight
+         # Black). Jumia Egypt only lists the 128GB variant, so there
+         # is no verified Jumia product URL for the 256GB model.
+         "amazon-eg": "https://www.amazon.eg/-/en/Xiaomi-Redmi-Note-13-Inches/dp/B0CWRLJYGJ"},
     ),
     (
         "Sony WH-1000XM5 Wireless Headphones",
