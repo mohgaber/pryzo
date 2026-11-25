@@ -155,7 +155,12 @@ PRODUCTS = [
         "https://m.media-amazon.com/images/I/51NRGHU2NoL._AC_SL1500_.jpg",
         {"amazon-eg": 11999.0, "jumia-eg": 12499.0, "noon": 11499.0},
         {"jumia-eg": _jumia_search("Apple AirPods Pro 2nd generation"),
-         "amazon-eg": "https://www.amazon.eg/dp/B0CHWRXH8B"},
+         "amazon-eg": "https://www.amazon.eg/dp/B0CHWRXH8B",
+         # Verified 2026-11-26 via Vodafone eShop on-site search (live
+         # browser): exact model, genuine Apple, price 10,999 EGP.
+         # Page says out of stock, so the refresh records it as
+         # unavailable — still a real live price, not a sample.
+         "vodafone": "https://eshop.vodafone.com.eg/en/prod/airpods-pro-2nd-gen-with-magsafe-charging-case---type-c"},
     ),
 ]
 
