@@ -16,6 +16,7 @@ import logging
 import os
 import secrets
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -114,6 +115,47 @@ class CouponCreate(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
+# In-memory TTL cache for the read endpoints below. Prices only change
+# when a refresh pass runs (every 30 min), so a 60s TTL is safe: the
+# worst case is a response up to 60s stale, and the cache is cleared
+# outright when a refresh finishes (see _run_refresh_in_background).
+# Without this, every app open / pull-to-refresh re-ran the same SQL
+# against Postgres.
+_CACHE: dict[str, tuple[float, object]] = {}
+_CACHE_TTL_SECONDS = 60.0
+_CACHE_MISS = object()
+
+
+def _cache_get(key: str) -> object:
+    entry = _CACHE.get(key)
+    if entry is None:
+        return _CACHE_MISS
+    ts, value = entry
+    if time.monotonic() - ts >= _CACHE_TTL_SECONDS:
+        del _CACHE[key]
+        return _CACHE_MISS
+    return value
+
+
+def _cache_put(key: str, value: object) -> None:
+    _CACHE[key] = (time.monotonic(), value)
+
+
+def _cache_invalidate() -> None:
+    _CACHE.clear()
+
+
+# App category keys (see lib/l10n/strings.dart `categoryKey`) mapped to
+# the category names stored on Product rows.
+CATEGORY_KEYS = {
+    "mobiles": "Smartphones",
+    "home": "Home Appliances",
+    "tvs": "TVs",
+    "gaming": "Gaming",
+    "audio": "Audio",
+}
+
+
 def _latest_prices(db: Session, product_id: int) -> list[PriceRecord]:
     """Latest LIVE PriceRecord per store for a product (cheapest first).
 
@@ -183,30 +225,97 @@ def _product_summary(db: Session, product: Product) -> dict:
     }
 
 
-def _latest_installment(
-    db: Session, product_id: int, store_id: int
-) -> InstallmentPlan | None:
-    """Latest installment plan for a product/store, LIVE preferred:
-    the newest live plan if one exists, else the newest sample plan
-    (a sample plan is an estimate only -- flagged via is_sample)."""
-    for live_only in (True, False):
-        plan = (
-            db.query(InstallmentPlan)
-            .filter(
-                InstallmentPlan.product_id == product_id,
-                InstallmentPlan.store_id == store_id,
-                InstallmentPlan.is_sample.is_(not live_only),
-            )
-            .order_by(InstallmentPlan.fetched_at.desc())
-            .first()
+def _lowest_prices_for(db: Session, product_ids: list[int]) -> dict[int, float]:
+    """Lowest LIVE price per product, for a whole page at once (one
+    query instead of one per product)."""
+    if not product_ids:
+        return {}
+    rows = (
+        db.query(PriceRecord.product_id, func.min(PriceRecord.price))
+        .filter(
+            PriceRecord.product_id.in_(product_ids),
+            PriceRecord.is_sample.is_(False),
         )
-        if plan is not None:
-            return plan
-    return None
+        .group_by(PriceRecord.product_id)
+        .all()
+    )
+    return {pid: float(price) for pid, price in rows}
 
 
-def _price_row(db: Session, rec: PriceRecord) -> dict:
-    store = db.get(Store, rec.store_id)
+def _store_counts_for(db: Session, product_ids: list[int]) -> dict[int, int]:
+    """Number of stores with a LIVE price per product, for a whole page
+    at once (one query instead of one per product)."""
+    if not product_ids:
+        return {}
+    rows = (
+        db.query(
+            PriceRecord.product_id,
+            func.count(func.distinct(PriceRecord.store_id)),
+        )
+        .filter(
+            PriceRecord.product_id.in_(product_ids),
+            PriceRecord.is_sample.is_(False),
+        )
+        .group_by(PriceRecord.product_id)
+        .all()
+    )
+    return {pid: int(n) for pid, n in rows}
+
+
+def _product_summaries(db: Session, products: list[Product]) -> list[dict]:
+    """Product summaries for a whole list with a FIXED number of
+    queries (lowest prices + store counts, batched) -- this is what
+    /search uses, so listing 20 products costs 2 extra queries, not
+    40 (the old per-product N+1)."""
+    ids = [p.id for p in products]
+    lowest = _lowest_prices_for(db, ids)
+    counts = _store_counts_for(db, ids)
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "brand": p.brand,
+            "category": p.category,
+            "image_url": p.image_url,
+            "lowest_price": lowest.get(p.id),
+            "stores_count": counts.get(p.id, 0),
+        }
+        for p in products
+    ]
+
+
+def _latest_plans_for(db: Session, product_id: int) -> dict[int, InstallmentPlan]:
+    """Latest installment plan per store for a product (one query).
+
+    LIVE preferred: the newest live plan if one exists, else the newest
+    sample plan (a sample plan is an estimate only -- flagged via
+    is_sample)."""
+    plans = (
+        db.query(InstallmentPlan)
+        .filter(InstallmentPlan.product_id == product_id)
+        .order_by(InstallmentPlan.fetched_at.desc())
+        .all()
+    )
+    by_store: dict[int, InstallmentPlan] = {}
+    for plan in plans:
+        current = by_store.get(plan.store_id)
+        if current is None:
+            by_store[plan.store_id] = plan
+        elif current.is_sample and not plan.is_sample:
+            # Newest plan overall is a sample but an older live plan
+            # exists: prefer the live one.
+            by_store[plan.store_id] = plan
+    return by_store
+
+
+def _price_row(
+    rec: PriceRecord,
+    store: Store | None,
+    plan: InstallmentPlan | None,
+    shipping: StoreShipping | None,
+) -> dict:
+    """One compare row from preloaded objects (no DB calls: the caller
+    loads stores, plans and shipping in bulk -- see compare())."""
     row = {
         "store": store.name if store else str(rec.store_id),
         "store_slug": store.slug if store else "",
@@ -221,12 +330,6 @@ def _price_row(db: Session, rec: PriceRecord) -> dict:
     # shipping for this store; total = price + fee when the fee is
     # known, else null. All new money fields are LIVE unless flagged
     # sample; sample-flagged values are estimates only.
-    plan = _latest_installment(db, rec.product_id, rec.store_id)
-    shipping = (
-        db.query(StoreShipping).filter_by(store_id=rec.store_id).first()
-        if store
-        else None
-    )
     row["installment_monthly"] = plan.monthly_amount if plan else None
     row["installment_months"] = plan.months if plan else None
     row["installment_is_sample"] = bool(plan.is_sample) if plan else False
@@ -243,8 +346,7 @@ def _price_row(db: Session, rec: PriceRecord) -> dict:
     return row
 
 
-def _coupon_row(db: Session, coupon: Coupon) -> dict:
-    store = db.get(Store, coupon.store_id)
+def _coupon_row(coupon: Coupon, store: Store | None) -> dict:
     return {
         "id": coupon.id,
         "store": store.name if store else str(coupon.store_id),
@@ -338,6 +440,9 @@ def _run_refresh_in_background() -> None:
         }
         log.exception("Admin refresh failed: %s", exc)
     finally:
+        # Prices changed: drop every cached read so the next request
+        # sees the fresh data.
+        _cache_invalidate()
         with _refresh_lock:
             _refresh_state["running"] = False
 
@@ -366,41 +471,105 @@ def admin_refresh_status(_: None = Depends(_require_refresh_token)) -> dict:
 
 
 @app.get("/search")
-def search(q: str = Query(default=""), db: Session = Depends(get_db)) -> list[dict]:
-    """Search products by name/brand (case-insensitive). Empty q returns all."""
+def search(
+    q: str = Query(default=""),
+    category: str | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Search products by name/brand (case-insensitive). Empty q returns
+    all. Paginated: `limit` (default 20, max 100) + `offset`; `category`
+    is an app category key (e.g. 'mobiles'), filtered server-side so
+    the app never has to fetch the whole catalogue to filter it.
+    Returns {"items": [...], "total": N, "limit": L, "offset": O}."""
+    key = f"search|{q}|{category}|{limit}|{offset}"
+    hit = _cache_get(key)
+    if hit is not _CACHE_MISS:
+        return hit  # type: ignore[return-value]
     query = db.query(Product)
     if q:
         like = f"%{q}%"
         query = query.filter(
             (Product.name.ilike(like)) | (Product.brand.ilike(like))
         )
-    products = query.order_by(Product.name.asc()).all()
-    return [_product_summary(db, p) for p in products]
+    if category and category != "all":
+        stored = CATEGORY_KEYS.get(category)
+        if stored is not None:
+            query = query.filter(Product.category == stored)
+    total = query.count()
+    products = query.order_by(Product.name.asc()).offset(offset).limit(limit).all()
+    result = {
+        "items": _product_summaries(db, products),
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+    _cache_put(key, result)
+    return result
 
 
 @app.get("/products/{product_id}")
 def get_product(product_id: int, db: Session = Depends(get_db)) -> dict:
+    key = f"product|{product_id}"
+    hit = _cache_get(key)
+    if hit is not _CACHE_MISS:
+        return hit  # type: ignore[return-value]
     product = _get_product_or_404(db, product_id)
     detail = _product_summary(db, product)
     detail["product_urls"] = product.product_urls
+    _cache_put(key, detail)
     return detail
 
 
 @app.get("/products/{product_id}/compare")
 def compare(product_id: int, db: Session = Depends(get_db)) -> dict:
+    key = f"compare|{product_id}"
+    hit = _cache_get(key)
+    if hit is not _CACHE_MISS:
+        return hit  # type: ignore[return-value]
     product = _get_product_or_404(db, product_id)
     latest = _latest_prices(db, product_id)
-    prices = [_price_row(db, rec) for rec in latest]
+    # Bulk preloads (one query each) instead of per-store lookups:
+    # stores, latest installment plan per store, shipping per store.
+    store_ids = [rec.store_id for rec in latest]
+    stores = (
+        {s.id: s for s in db.query(Store).filter(Store.id.in_(store_ids)).all()}
+        if store_ids
+        else {}
+    )
+    plans = _latest_plans_for(db, product_id)
+    shipping = (
+        {
+            s.store_id: s
+            for s in db.query(StoreShipping)
+            .filter(StoreShipping.store_id.in_(store_ids))
+            .all()
+        }
+        if store_ids
+        else {}
+    )
+    prices = [
+        _price_row(
+            rec,
+            stores.get(rec.store_id),
+            plans.get(rec.store_id),
+            shipping.get(rec.store_id),
+        )
+        for rec in latest
+    ]
     cheapest = prices[0] if prices else None
     savings = 0.0
     if len(prices) >= 2:
         savings = round(max(p["price"] for p in prices) - min(p["price"] for p in prices), 2)
-    return {
+    result = {
         "product": _product_summary(db, product),
         "prices": prices,
         "cheapest": cheapest,
         "savings_vs_max": savings,
     }
+    _cache_put(key, result)
+    return result
 
 
 @app.get("/products/{product_id}/advice")
@@ -414,6 +583,10 @@ def advice(product_id: int, db: Session = Depends(get_db)) -> dict:
     entirely: they cannot move the verdict, the low, or the average.
     """
     _get_product_or_404(db, product_id)
+    key = f"advice|{product_id}"
+    hit = _cache_get(key)
+    if hit is not _CACHE_MISS:
+        return hit  # type: ignore[return-value]
     since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
     points = (
         db.query(PriceRecord.price)
@@ -428,7 +601,7 @@ def advice(product_id: int, db: Session = Depends(get_db)) -> dict:
     latest = _latest_prices(db, product_id)
     current = min((r.price for r in latest), default=None)
     if not values:
-        return {
+        result = {
             "product_id": product_id,
             "current": float(current) if current is not None else None,
             "low_30d": None,
@@ -436,6 +609,8 @@ def advice(product_id: int, db: Session = Depends(get_db)) -> dict:
             "points_used": 0,
             "verdict": "unknown",
         }
+        _cache_put(key, result)
+        return result
     low_30d = min(values)
     avg_30d = sum(values) / len(values)
     if len(values) < 3:
@@ -446,7 +621,7 @@ def advice(product_id: int, db: Session = Depends(get_db)) -> dict:
         verdict = "wait"
     else:
         verdict = "fair"
-    return {
+    result = {
         "product_id": product_id,
         "current": float(current) if current is not None else None,
         "low_30d": float(low_30d),
@@ -454,6 +629,8 @@ def advice(product_id: int, db: Session = Depends(get_db)) -> dict:
         "points_used": len(values),
         "verdict": verdict,
     }
+    _cache_put(key, result)
+    return result
 
 
 @app.get("/products/{product_id}/coupons")
@@ -474,7 +651,12 @@ def product_coupons(product_id: int, db: Session = Depends(get_db)) -> list[dict
         .order_by(Coupon.store_id.asc(), Coupon.code.asc())
         .all()
     )
-    return [_coupon_row(db, c) for c in coupons]
+    stores = (
+        {s.id: s for s in db.query(Store).filter(Store.id.in_(store_ids)).all()}
+        if store_ids
+        else {}
+    )
+    return [_coupon_row(c, stores.get(c.store_id)) for c in coupons]
 
 
 @app.get("/coupons")
@@ -489,7 +671,14 @@ def list_coupons(
         if store is None:
             raise HTTPException(status_code=404, detail="Store not found")
         query = query.filter(Coupon.store_id == store.id)
-    return [_coupon_row(db, c) for c in query.order_by(Coupon.code.asc()).all()]
+    coupons = query.order_by(Coupon.code.asc()).all()
+    store_ids = [c.store_id for c in coupons]
+    stores = (
+        {s.id: s for s in db.query(Store).filter(Store.id.in_(store_ids)).all()}
+        if store_ids
+        else {}
+    )
+    return [_coupon_row(c, stores.get(c.store_id)) for c in coupons]
 
 
 @app.post("/coupons", status_code=201)
@@ -519,7 +708,7 @@ def create_coupon(body: CouponCreate, db: Session = Depends(get_db)) -> dict:
     db.add(coupon)
     db.commit()
     db.refresh(coupon)
-    return _coupon_row(db, coupon)
+    return _coupon_row(coupon, store)
 
 
 @app.get("/products/{product_id}/history")
@@ -529,6 +718,10 @@ def history(
     db: Session = Depends(get_db),
 ) -> list[dict]:
     _get_product_or_404(db, product_id)
+    key = f"history|{product_id}|{days}"
+    hit = _cache_get(key)
+    if hit is not _CACHE_MISS:
+        return hit  # type: ignore[return-value]
     since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
     records = (
         db.query(PriceRecord)
@@ -539,11 +732,20 @@ def history(
         .order_by(PriceRecord.fetched_at.desc())
         .all()
     )
-    return [
+    store_ids = [rec.store_id for rec in records]
+    stores = (
+        {s.id: s for s in db.query(Store).filter(Store.id.in_(store_ids)).all()}
+        if store_ids
+        else {}
+    )
+    result = [
         {
             "price": rec.price,
-            "store": (db.get(Store, rec.store_id).name
-                      if db.get(Store, rec.store_id) else str(rec.store_id)),
+            "store": (
+                stores[rec.store_id].name
+                if rec.store_id in stores
+                else str(rec.store_id)
+            ),
             "fetched_at": rec.fetched_at.isoformat(),
             # History keeps BOTH sample and live points, flagged, so a
             # sample price is never mistaken for a real price move.
@@ -551,17 +753,30 @@ def history(
         }
         for rec in records
     ]
+    _cache_put(key, result)
+    return result
 
 
 @app.get("/watchlist")
 def list_watchlist(db: Session = Depends(get_db)) -> list[dict]:
     items = db.query(WatchlistItem).order_by(WatchlistItem.created_at.desc()).all()
+    product_ids = [item.product_id for item in items]
+    products = (
+        {p.id: p for p in db.query(Product).filter(Product.id.in_(product_ids)).all()}
+        if product_ids
+        else {}
+    )
+    summaries = {
+        s["id"]: s
+        for s in _product_summaries(
+            db, [products[pid] for pid in product_ids if pid in products]
+        )
+    }
     result = []
     for item in items:
-        product = db.get(Product, item.product_id)
-        if product is None:
+        entry = summaries.get(item.product_id)
+        if entry is None:
             continue
-        entry = _product_summary(db, product)
         result.append({
             "id": item.id,
             "product_id": item.product_id,
@@ -642,9 +857,15 @@ def create_alert(body: AlertCreate, db: Session = Depends(get_db)) -> dict:
 @app.get("/alerts")
 def list_alerts(db: Session = Depends(get_db)) -> list[dict]:
     alerts = db.query(PriceAlert).order_by(PriceAlert.created_at.desc()).all()
+    product_ids = [alert.product_id for alert in alerts]
+    products = (
+        {p.id: p for p in db.query(Product).filter(Product.id.in_(product_ids)).all()}
+        if product_ids
+        else {}
+    )
     result = []
     for alert in alerts:
-        product = db.get(Product, alert.product_id)
+        product = products.get(alert.product_id)
         result.append({
             "id": alert.id,
             "product_id": alert.product_id,

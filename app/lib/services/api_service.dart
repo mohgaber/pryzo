@@ -2,9 +2,12 @@
 //
 // Contract (JSON):
 //   GET    /health                      -> {"status": "ok"}
-//   GET    /search?q=...                -> [{id, name, brand, category,
-//                                            image_url, lowest_price,
-//                                            stores_count}]
+//   GET    /search?q=...&category=...&limit=20&offset=0
+//                                            -> {"items": [{id, name, brand,
+//                                            category, image_url,
+//                                            lowest_price, stores_count}],
+//                                            "total": N, "limit": 20,
+//                                            "offset": 0} (paginated)
 //   GET    /products/{id}              -> product detail
 //   GET    /products/{id}/compare      -> {"product": {...},
 //                                            "prices": [{store, store_slug,
@@ -142,15 +145,34 @@ class ApiService {
     }
   }
 
-  /// GET /search?q=...
-  Future<List<Product>> searchProducts(String q) async {
-    final data = await _getJson(
-      '/search?q=${Uri.encodeQueryComponent(q)}',
+  /// GET /search?q=...&category=...&limit=...&offset=...
+  ///
+  /// Paginated (default 20 per page): pass [offset] to fetch the next
+  /// page; [total] is the number of matching products on the server.
+  /// [category] is an app category key ('mobiles', 'home', ...) or
+  /// 'all'/null for no category filter (filtered server-side).
+  Future<SearchPage> searchProducts(
+    String q, {
+    String? category,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final params = StringBuffer(
+      '/search?q=${Uri.encodeQueryComponent(q)}'
+      '&limit=$limit&offset=$offset',
     );
-    final list = data as List<dynamic>;
-    return list
-        .map((e) => Product.fromJson(e as Map<String, dynamic>))
-        .toList();
+    if (category != null && category != 'all') {
+      params.write('&category=${Uri.encodeQueryComponent(category)}');
+    }
+    final data = await _getJson(params.toString());
+    final map = data as Map<String, dynamic>;
+    final list = map['items'] as List<dynamic>;
+    return SearchPage(
+      items: list
+          .map((e) => Product.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      total: (map['total'] as num).toInt(),
+    );
   }
 
   /// GET /products/{id}
@@ -266,6 +288,15 @@ class ApiService {
   void dispose() {
     _client.close();
   }
+}
+
+/// A page of search results: the products on this page plus the total
+/// number of matching products on the server (for "load more").
+class SearchPage {
+  const SearchPage({required this.items, required this.total});
+
+  final List<Product> items;
+  final int total;
 }
 
 class ApiException implements Exception {

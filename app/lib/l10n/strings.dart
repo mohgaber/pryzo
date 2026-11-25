@@ -82,6 +82,7 @@ class AppStrings {
       // Home / search.
       'searchHint': 'دوّر على منتج… مثال: آيفون 15',
       'noResults': 'لا توجد نتائج مطابقة — جرّب كلمة بحث أخرى',
+      'loadMore': 'عرض المزيد',
       'priceUnavailable': 'السعر غير متاح',
       'storesCount': '{n} متاجر',
       'cat_all': 'الكل',
@@ -223,6 +224,7 @@ class AppStrings {
       // Home / search.
       'searchHint': 'Search for a product… e.g. iPhone 15',
       'noResults': 'No matching results — try another search word',
+      'loadMore': 'Load more',
       'priceUnavailable': 'Price unavailable',
       'storesCount': '{n} stores',
       'cat_all': 'All',

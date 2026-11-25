@@ -56,6 +56,14 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isSample = true;
   String? _error;
 
+  /// One page of products from the server.
+  static const int _pageSize = 20;
+
+  /// Pagination state for the server-side search (see _load).
+  int _offset = 0;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -72,25 +80,44 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  /// Loads products from the server, one page at a time. [reset]
+  /// starts from the first page (new search / new category); otherwise
+  /// the next page is appended (the "load more" button). The category
+  /// filter runs on the server now, so the app never fetches the whole
+  /// catalogue just to filter it.
+  Future<void> _load({bool reset = true}) async {
+    if (reset) {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+      });
+    } else {
+      if (_loadingMore || !_hasMore) {
+        return;
+      }
+      setState(() {
+        _loadingMore = true;
+      });
+    }
     try {
-      final results = await widget.api.searchProducts(_searchController.text);
+      final page = await widget.api.searchProducts(
+        _searchController.text,
+        category: _category,
+        limit: _pageSize,
+        offset: reset ? 0 : _offset,
+      );
       if (!mounted) {
         return;
       }
-      final filtered = _category == 'all'
-          ? results
-          : results
-              .where((p) => categoryKey(p.category) == _category)
-              .toList();
       setState(() {
-        _products = filtered;
+        _products =
+            reset ? page.items : <Product>[..._products, ...page.items];
+        _offset = _products.length;
+        _hasMore = _products.length < page.total;
         _isSample = false;
         _loading = false;
+        _loadingMore = false;
       });
     } catch (_) {
       // Backend unreachable: fall back to bundled sample data, never crash.
@@ -98,9 +125,14 @@ class _HomeScreenState extends State<HomeScreen>
         return;
       }
       setState(() {
-        _products = sampleSearch(_searchController.text, _category);
-        _isSample = true;
+        if (reset) {
+          _products = sampleSearch(_searchController.text, _category);
+          _offset = _products.length;
+          _hasMore = false;
+          _isSample = true;
+        }
         _loading = false;
+        _loadingMore = false;
       });
     }
   }
@@ -131,82 +163,125 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     super.build(context);
     return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: <Widget>[
-          if (_isSample) ...<Widget>[
-            const SampleBanner(),
-            const SizedBox(height: 12),
-          ],
-          TextField(
-            controller: _searchController,
-            onChanged: _onSearchChanged,
-            onSubmitted: (_) => _load(),
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: tr(context, 'searchHint'),
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _load();
+      onRefresh: () => _load(),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: <Widget>[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  if (_isSample) ...<Widget>[
+                    const SampleBanner(),
+                    const SizedBox(height: 12),
+                  ],
+                  TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    onSubmitted: (_) => _load(),
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: tr(context, 'searchHint'),
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                                _load();
+                              },
+                            ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 40,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: categoryKeys.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final category = categoryKeys[index];
+                        final selected = category == _category;
+                        return ChoiceChip(
+                          label: Text(tr(context, 'cat_$category')),
+                          selected: selected,
+                          onSelected: (_) => _onCategorySelected(category),
+                          selectedColor: const Color(0xFF475569),
+                          labelStyle: TextStyle(
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF334155),
+                          ),
+                          backgroundColor: Colors.white,
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        );
                       },
                     ),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: categoryKeys.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final category = categoryKeys[index];
-                final selected = category == _category;
-                return ChoiceChip(
-                  label: Text(tr(context, 'cat_$category')),
-                  selected: selected,
-                  onSelected: (_) => _onCategorySelected(category),
-                  selectedColor: const Color(0xFF475569),
-                  labelStyle: TextStyle(
-                    color: selected ? Colors.white : const Color(0xFF334155),
-                  ),
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
           if (_loading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(),
+            const SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(),
+                ),
               ),
             )
           else if (_error != null)
-            Center(child: Text(_error!))
+            SliverToBoxAdapter(child: Center(child: Text(_error!)))
           else if (_products.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(tr(context, 'noResults')),
+            SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(tr(context, 'noResults')),
+                ),
               ),
             )
           else
-            ..._products.map(_productCard),
+            // Lazy: only the product cards on screen are built (and
+            // their images decoded), not the whole catalogue at once.
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList.builder(
+                itemCount: _products.length,
+                itemBuilder: (context, index) =>
+                    _productCard(_products[index]),
+              ),
+            ),
+          if (_hasMore && !_loading && _products.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Center(
+                  child: _loadingMore
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(),
+                        )
+                      : OutlinedButton(
+                          onPressed: () => _load(reset: false),
+                          child: Text(tr(context, 'loadMore')),
+                        ),
+                ),
+              ),
+            ),
         ],
       ),
     );

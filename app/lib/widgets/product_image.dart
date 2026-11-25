@@ -28,10 +28,15 @@ class ProductImage extends StatelessWidget {
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
+      // Decode at the displayed size (52px x device pixel ratio),
+      // not at the store image's full resolution: a 5 MB photo is
+      // never decoded just to show a 52px thumbnail.
       child: Image.network(
         url,
         width: size,
         height: size,
+        cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+        cacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => _placeholder(),
       ),
