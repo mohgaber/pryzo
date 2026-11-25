@@ -81,7 +81,7 @@ class ApiService {
   ///   (the emulator's alias for the host machine's localhost).
   /// - Physical Android phone: use the PC's LAN IP, e.g.
   ///   http://192.168.1.10:8000 (phone and PC on the same Wi-Fi).
-  static const String defaultBaseUrl = 'http://127.0.0.1:8000';
+  static const String defaultBaseUrl = 'https://pryzo-api-production.up.railway.app';
 
   final String baseUrl;
   final http.Client _client;
