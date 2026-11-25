@@ -1,0 +1,49 @@
+name: Nightly product discovery
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      store:
+        description: "Store slug to scan (empty = all configured stores)"
+        required: false
+        default: ""
+      limit:
+        description: "Max product URLs fetched per store"
+        required: false
+        default: "200"
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    env:
+      API: https://pryzo-api-production.up.railway.app
+      LIMIT: ${{ inputs.limit || '200' }}
+      STORE: ${{ inputs.store || '' }}
+    steps:
+      - name: Start discovery run
+        run: |
+          URL="$API/admin/discover?limit=$LIMIT"
+          if [ -n "$STORE" ]; then URL="$URL&store=$STORE"; fi
+          code=$(curl -s -o /tmp/start.json -w "%{http_code}" -X POST "$URL" \
+            -H "X-Refresh-Token: ${{ secrets.PRYZO_REFRESH_TOKEN }}")
+          echo "POST $URL -> HTTP $code"
+          cat /tmp/start.json; echo
+          test "$code" = "202" || exit 1
+
+      - name: Wait for discovery to finish (up to 90 min)
+        run: |
+          for i in $(seq 1 90); do
+            sleep 60
+            body=$(curl -s "$API/admin/discover/status" \
+              -H "X-Refresh-Token: ${{ secrets.PRYZO_REFRESH_TOKEN }}")
+            running=$(echo "$body" | python3 -c "import json,sys; print(json.load(sys.stdin)['running'])")
+            echo "minute $i: running=$running"
+            if [ "$running" = "False" ]; then
+              echo "$body" | python3 -m json.tool
+              exit 0
+            fi
+          done
+          echo "Discovery did not finish within 90 minutes"
+          exit 1
