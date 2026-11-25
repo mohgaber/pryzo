@@ -1,0 +1,21 @@
+name: Keep alive & refresh prices
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+jobs:
+  keep-alive-refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health (keep awake)
+        run: curl -fsS https://pryzo-api-production.up.railway.app/health
+      - name: Refresh prices (every 30 min or manual run)
+        if: github.event.schedule == '*/30 * * * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Triggering refresh..."
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://pryzo-api-production.up.railway.app/admin/refresh -H "X-Refresh-Token: ${{ secrets.PRYZO_REFRESH_TOKEN }}")
+          echo "refresh POST status: $CODE"
+          sleep 90
+          echo "Refresh status:"
+          curl -fsS https://pryzo-api-production.up.railway.app/admin/refresh/status -H "X-Refresh-Token: ${{ secrets.PRYZO_REFRESH_TOKEN }}"
