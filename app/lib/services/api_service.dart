@@ -50,8 +50,9 @@
 //   installment_months, installment_is_sample, shipping_fee,
 //   shipping_is_sample, delivery_days_min/max, total_price.
 //
-// Every call uses a short (10s) timeout and throws on network error,
-// timeout or non-2xx status. Callers catch that and fall back to the
+// Every call uses a 20s timeout and throws on network error,
+// timeout or non-2xx status. GETs get one automatic retry (see
+// _getJson); callers catch the throw and fall back to the
 // bundled sample data (see lib/data/sample_data.dart) — the app must never
 // crash just because the backend is unreachable.
 
@@ -89,14 +90,32 @@ class ApiService {
   final String baseUrl;
   final http.Client _client;
 
-  static const Duration _timeout = Duration(seconds: 10);
+  static const Duration _timeout = Duration(seconds: 20);
 
   Map<String, String> get _headers => <String, String>{
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
 
+  /// GET with one automatic retry on network/timeout errors: a slow
+  /// mobile network or a brief server restart (e.g. a Railway
+  /// redeploy) must not drop the app straight into its bundled sample
+  /// data. Non-2xx statuses and bad JSON are not retried (the server
+  /// answered; retrying will not help). Only GETs are retried —
+  /// POST/DELETE are user actions and must never run twice.
   Future<dynamic> _getJson(String path) async {
+    try {
+      return await _getJsonOnce(path);
+    } on TimeoutException catch (_) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      return _getJsonOnce(path);
+    } on http.ClientException catch (_) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      return _getJsonOnce(path);
+    }
+  }
+
+  Future<dynamic> _getJsonOnce(String path) async {
     final response = await _client
         .get(Uri.parse('$baseUrl$path'), headers: _headers)
         .timeout(_timeout);
