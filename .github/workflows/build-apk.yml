@@ -28,6 +28,8 @@ jobs:
           keyAlias=$KEY_ALIAS
           storeFile=pryzo-release.keystore
           EOF
+          sha256sum app/android/app/pryzo-release.keystore
+          keytool -list -keystore app/android/app/pryzo-release.keystore -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS"
       - run: flutter build apk --release
         working-directory: app
       - run: |
