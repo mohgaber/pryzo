@@ -85,6 +85,15 @@ STORE_BASE_URLS = {
     "vodafone": "https://eshop.vodafone.com.eg",
     "carrefour": "https://www.carrefouregypt.com",
     "souq": "https://egypt.souq.com",
+    # Added 2026-11-26 ("do like PriceTeq": crawl the shops directly).
+    # Verified product pages exist on each for Pryzo's products.
+    "sharafdg": "https://egypt.sharafdg.com",
+    "2b": "https://2b.com.eg",
+    "btech": "https://btech.com",
+    "rayashop": "https://www.rayashop.com",
+    "ehabgroup": "https://www.ehabgroup.com",
+    "wazen": "https://wazen.eg",
+    "imedia": "https://www.imediastores.com",
 }
 
 # CSS selectors tried (in order) after JSON-LD and meta tags.
