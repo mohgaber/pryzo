@@ -470,6 +470,106 @@ def admin_refresh_status(_: None = Depends(_require_refresh_token)) -> dict:
     }
 
 
+# --- Automatic product discovery -------------------------------------------
+# POST /admin/discover starts a discovery run in a background thread and
+# returns 202 immediately; the report is available afterwards from
+# GET /admin/discover/status. Same auth as /admin/refresh.
+#
+# Discovery finds NEW products by itself: it enumerates a shop's
+# products from the shop's public sitemap, fetches each page's
+# schema.org Product JSON-LD, and matches the listing against Pryzo's
+# catalog (see discover.py). A matched listing gives us a NEW store URL
+# for an existing product; an unmatched listing is a candidate NEW
+# product. Nothing is written to the database by discovery — a human
+# reviews the report and adds the URLs to seed.py, so a bad match can
+# never pollute the catalog on its own.
+#
+# A full catalog scan is slow (2s politeness delay per page; wazen has
+# ~800 products), so this is a nightly job, not a 30-minute one. The
+# `limit` query param caps the product URLs fetched per store
+# (default 200, enough for a good chunk of a shop per night).
+_discover_lock = threading.Lock()
+_discover_state: dict = {"running": False, "last_run": None}
+
+
+def _run_discover_in_background(store: str | None, limit: int) -> None:
+    """Run one discovery pass in a thread; record its report for
+    GET /admin/discover/status."""
+    import discover
+
+    started_at = datetime.now(timezone.utc).isoformat()
+    try:
+        db = next(get_db())
+        try:
+            products = [
+                {"name": p.name, "brand": p.brand}
+                for p in db.query(Product).all()
+            ]
+        finally:
+            db.close()
+        stores = [store] if store else sorted(discover.SITEMAP_CONFIG)
+        reports = {}
+        for slug in stores:
+            reports[slug] = discover.discover(slug, products, max_urls=limit)
+        _discover_state["last_run"] = {
+            "started_at": started_at,
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "status": "ok",
+            "stores": reports,
+        }
+        log.info(
+            "Admin discover finished: %s",
+            {
+                slug: {
+                    "matched_products": len(r["matched"]),
+                    "candidates": len(r["unmatched_candidates"]),
+                }
+                for slug, r in reports.items()
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 - record the failure, keep the API up
+        _discover_state["last_run"] = {
+            "started_at": started_at,
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "status": "error",
+            "error": str(exc),
+        }
+        log.exception("Admin discover failed: %s", exc)
+    finally:
+        with _discover_lock:
+            _discover_state["running"] = False
+
+
+@app.post("/admin/discover", status_code=202)
+def admin_discover(
+    store: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=2000),
+    _: None = Depends(_require_refresh_token),
+) -> dict:
+    with _discover_lock:
+        if _discover_state["running"]:
+            raise HTTPException(
+                status_code=409, detail="A discovery run is already running"
+            )
+        _discover_state["running"] = True
+    thread = threading.Thread(
+        target=_run_discover_in_background,
+        args=(store, limit),
+        daemon=True,
+        name="pryzo-discover",
+    )
+    thread.start()
+    return {"status": "started", "store": store or "all", "limit": limit}
+
+
+@app.get("/admin/discover/status")
+def admin_discover_status(_: None = Depends(_require_refresh_token)) -> dict:
+    return {
+        "running": _discover_state["running"],
+        "last_run": _discover_state["last_run"],
+    }
+
+
 @app.get("/search")
 def search(
     q: str = Query(default=""),
