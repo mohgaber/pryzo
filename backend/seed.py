@@ -165,10 +165,13 @@ PRODUCTS = [
         "Samsung",
         "Smartphones",
         None,
-        {"sharafdg": 46783.0},
+        {"sharafdg": 46783.0, "btech": 38999.0},
         # Verified 2026-11-26: Sharaf DG Cobalt Violet 46,783 EGP,
-        # out of stock.
-        {"sharafdg": "https://egypt.sharafdg.com/product/samsung-galaxy-s24-5g-256gb-8gb-cobalt-violet-dual-sim-smartphone-middle-east-version/"},
+        # out of stock. Sharaf DG fails from Railway, so B.TECH is the
+        # working source — 38,999 EGP, out of stock (verified via
+        # crawler: JSON-LD 38,999 EGP, in_stock false).
+        {"sharafdg": "https://egypt.sharafdg.com/product/samsung-galaxy-s24-5g-256gb-8gb-cobalt-violet-dual-sim-smartphone-middle-east-version/",
+         "btech": "https://btech.com/en/p/samsung-galaxy-s24-256gb-8gb-4g-lte-dual-sim-onys-black"},
     ),
     (
         "Samsung Galaxy A55 5G 256GB",
