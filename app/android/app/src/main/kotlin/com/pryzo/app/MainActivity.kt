@@ -1,4 +1,4 @@
-package com.pryzo.pryzo
+package com.pryzo.app
 
 import io.flutter.embedding.android.FlutterActivity
 
