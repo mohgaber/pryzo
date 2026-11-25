@@ -201,11 +201,11 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       },
       child: Card(
         color: Colors.white,
-        elevation: 0,
+        elevation: 1,
         margin: const EdgeInsets.only(bottom: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFFE2E8F0)),
+          side: const BorderSide(color: Color(0xFFEAF0F6)),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -221,7 +221,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        name,
+                        ltr(name),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -247,7 +247,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                                 }),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF475569),
+                          color: Color(0xFF0F172A),
+                          fontSize: 16,
                         ),
                       ),
                       if (item.id < 0)

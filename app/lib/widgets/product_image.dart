@@ -5,6 +5,9 @@
 // Sample data has image_url null, so sample products always show the
 // placeholder. A broken/empty URL falls back to the same placeholder
 // via [Image.network]'s errorBuilder — never a broken-image icon.
+// The photo is shown whole with no cropping (BoxFit.contain): store
+// photos are usually square shots on a clean background, and cropping
+// them (cover) cut off edges of the product.
 
 import 'package:flutter/material.dart';
 
@@ -37,7 +40,7 @@ class ProductImage extends StatelessWidget {
         height: size,
         cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
         cacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         errorBuilder: (_, _, _) => _placeholder(),
       ),
     );

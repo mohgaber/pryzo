@@ -401,10 +401,10 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
     final cheapest = result.cheapest;
     return Card(
       color: Colors.white,
-      elevation: 0,
+      elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFEAF0F6)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -418,7 +418,7 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    result.product.name,
+                    ltr(result.product.name),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -445,7 +445,7 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF475569),
+                            color: Color(0xFF0F172A),
                           ),
                         ),
                       ),
@@ -481,10 +481,10 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
     final advice = _advice;
     return Card(
       color: Colors.white,
-      elevation: 0,
+      elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFEAF0F6)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -651,13 +651,13 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       color: isCheapest ? const Color(0xFFF0FDF4) : Colors.white,
-      elevation: 0,
+      elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: isCheapest
               ? const Color(0xFF86EFAC)
-              : const Color(0xFFE2E8F0),
+              : const Color(0xFFEAF0F6),
         ),
       ),
       child: Padding(
@@ -1000,10 +1000,10 @@ class _ComparisonScreenState extends State<ComparisonScreen> {
   Widget _alertSection(CompareResult result, String lc) {
     return Card(
       color: Colors.white,
-      elevation: 0,
+      elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFEAF0F6)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),

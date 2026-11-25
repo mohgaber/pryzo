@@ -25,3 +25,10 @@ String shortDate(String iso) {
   }
   return '${parsed.day}/${parsed.month}';
 }
+
+/// Wraps [text] in Unicode left-to-right isolates (U+2066 … U+2069) so a
+/// Latin-script product name with numbers ("iPhone 15 128GB") keeps its
+/// logical order inside an RTL (Arabic) paragraph, instead of the bidi
+/// algorithm shuffling the model number and the capacity. Display-only:
+/// the raw name is still used for search, filtering and sharing.
+String ltr(String text) => '\u2066$text\u2069';

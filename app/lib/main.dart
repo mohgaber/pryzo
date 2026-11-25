@@ -187,24 +187,12 @@ class _MainScreenState extends State<MainScreen> {
     final provider = widget.localeProvider;
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Image.asset(
-              'assets/pryzo_logo.webp',
-              height: 32,
-              width: 32,
-              errorBuilder: (_, _, _) => const Icon(
-                Icons.local_offer,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _currentIndex == 0 ? 'Pryzo' : titles[_currentIndex],
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
+        // Title only: the logo asset has a white background, so next to
+        // the name on the slate AppBar it read as an unclear white
+        // square. The wordmark alone is cleaner.
+        title: Text(
+          _currentIndex == 0 ? 'Pryzo' : titles[_currentIndex],
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: <Widget>[
           PopupMenuButton<Locale>(
@@ -238,11 +226,9 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: tr(context, 'searchTooltip'),
-            onPressed: () => _onTabTapped(0),
-          ),
+          // No search action here: the home tab already has the main
+          // search bar, and a second search icon in the header was a
+          // duplicate.
         ],
       ),
       body: IndexedStack(
@@ -254,7 +240,7 @@ class _MainScreenState extends State<MainScreen> {
         onTap: _onTabTapped,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF475569),
-        unselectedItemColor: const Color(0xFF94A3B8),
+        unselectedItemColor: const Color(0xFF64748B),
         backgroundColor: Colors.white,
         items: <BottomNavigationBarItem>[
           BottomNavigationBarItem(

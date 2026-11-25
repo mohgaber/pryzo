@@ -177,29 +177,41 @@ class _HomeScreenState extends State<HomeScreen>
                     const SampleBanner(),
                     const SizedBox(height: 12),
                   ],
-                  TextField(
-                    controller: _searchController,
-                    onChanged: _onSearchChanged,
-                    onSubmitted: (_) => _load(),
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      hintText: tr(context, 'searchHint'),
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                _load();
-                              },
-                            ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: Color(0xFFE2E8F0)),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const <BoxShadow>[
+                        BoxShadow(
+                          color: Color(0x0A0F172A),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: _onSearchChanged,
+                      onSubmitted: (_) => _load(),
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        hintText: tr(context, 'searchHint'),
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _searchController.text.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _load();
+                                },
+                              ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
                       ),
                     ),
                   ),
@@ -216,6 +228,7 @@ class _HomeScreenState extends State<HomeScreen>
                         return ChoiceChip(
                           label: Text(tr(context, 'cat_$category')),
                           selected: selected,
+                          showCheckmark: false,
                           onSelected: (_) => _onCategorySelected(category),
                           selectedColor: const Color(0xFF475569),
                           labelStyle: TextStyle(
@@ -301,10 +314,10 @@ class _HomeScreenState extends State<HomeScreen>
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       color: Colors.white,
-      elevation: 0,
+      elevation: 1,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFEAF0F6)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -320,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      product.name,
+                      ltr(product.name),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
@@ -343,8 +356,8 @@ class _HomeScreenState extends State<HomeScreen>
                               : formatEgp(product.lowestPrice!, locale: lc),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF475569),
-                            fontSize: 15,
+                            color: Color(0xFF0F172A),
+                            fontSize: 16,
                           ),
                         ),
                         const SizedBox(width: 8),

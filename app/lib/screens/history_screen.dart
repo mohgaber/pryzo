@@ -209,10 +209,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
           const SizedBox(height: 16),
           Card(
             color: Colors.white,
-            elevation: 0,
+            elevation: 1,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              side: const BorderSide(color: Color(0xFFEAF0F6)),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -238,11 +238,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ..._points.reversed.take(6).map(
               (point) => Card(
                 color: Colors.white,
-                elevation: 0,
+                elevation: 1,
                 margin: const EdgeInsets.only(bottom: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  side: const BorderSide(color: Color(0xFFEAF0F6)),
                 ),
                 child: ListTile(
                   leading: const Icon(
@@ -341,14 +341,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
           });
     return Card(
       color: triggered ? const Color(0xFFF0FDF4) : Colors.white,
-      elevation: 0,
+      elevation: 1,
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
           color: triggered
               ? const Color(0xFF86EFAC)
-              : const Color(0xFFE2E8F0),
+              : const Color(0xFFEAF0F6),
         ),
       ),
       child: ListTile(
